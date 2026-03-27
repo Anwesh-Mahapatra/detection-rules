@@ -107,16 +107,6 @@ python scripts/sigma2splunk.py rules/windows/ --no-test
 python scripts/sigma2splunk.py rules/windows/credential_access/lsass_access.yml --earliest=-7d
 ```
 
-## Detection Coverage
-
-| MITRE Tactic | Technique ID | Rule | Tested |
-|---|---|---|---|
-| Execution | T1059.001 | PowerShell Suspicious Execution | ☐ |
-| Persistence | T1053.005 | Scheduled Task Creation | ☐ |
-| Credential Access | T1003.001 | LSASS Memory Access | ☐ |
-| Defense Evasion | T1070.001 | Event Log Clearing | ☐ |
-| Defense Evasion | T1562.001 | Sysmon Service Tampering | ☐ |
-
 ## Lab Architecture
 
 ```
