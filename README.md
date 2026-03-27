@@ -124,25 +124,25 @@ python scripts/sigma2splunk.py rules/windows/credential_access/lsass_access.yml 
 │  Proxmox VE — Dell PowerEdge R720                        │
 │  32 threads | 32GB RAM | ZFS RAIDZ1                      │
 ├──────────────────────────────────────────────────────────┤
-│                                                           │
+│                                                          │
 │  VM 107 — soc-stack (Ubuntu 24.04)                       │
 │  ├── Splunk Free              :8000                      │
 │  ├── Grafana + Loki           :3000 / :3100              │
 │  ├── TheHive + Cortex         :9000 / :9001              │
 │  ├── n8n                      :5678                      │
 │  └── CALDERA                  :8888                      │
-│                                                           │
+│                                                          │
 │  VM 106 — Win11-Baseline (Victim)                        │
 │  ├── Sysmon (SwiftOnSecurity config)                     │
 │  ├── Splunk Universal Forwarder → soc-stack:9997         │
 │  ├── Atomic Red Team                                     │
 │  └── CALDERA Sandcat Agent                               │
-│                                                           │
+│                                                          │
 │  VM 100 — FlareVM (Analyst Workstation)                  │
 │  ├── Git + SSH → GitHub                                  │
 │  ├── Python + pySigma                                    │
 │  └── sigma2splunk.py (writes + tests rules)              │
-│                                                           │
+│                                                          │
 └──────────────────────────────────────────────────────────┘
 ```
 
