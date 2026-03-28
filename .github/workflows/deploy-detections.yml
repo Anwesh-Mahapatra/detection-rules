@@ -4,18 +4,31 @@ on:
   push:
     branches: [main]
     paths:
-      - 'rules/**'          # Only trigger when rules change
-      - 'scripts/**'        # Or when scripts change
+      - 'rules/**'
+      - 'scripts/**'
 
-  workflow_dispatch:         # Allow manual trigger from GitHub UI
+  workflow_dispatch:
+    inputs:
+      force_all:
+        description: 'Force redeploy ALL rules'
+        required: false
+        type: boolean
+        default: false
+      dry_run:
+        description: 'Dry run (no actual changes)'
+        required: false
+        type: boolean
+        default: false
 
 jobs:
   convert-and-deploy:
-    runs-on: self-hosted     # Runs on your soc-stack runner
-    
+    runs-on: self-hosted
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -24,26 +37,50 @@ jobs:
 
       - name: Install dependencies
         run: |
-          pip install pySigma pySigma-backend-splunk pySigma-pipeline-sysmon PyYAML requests
+          pip install pySigma pySigma-backend-splunk pySigma-pipeline-sysmon pySigma-pipeline-splunk PyYAML requests
 
-      - name: Convert all Sigma rules to SPL
+      - name: Convert changed Sigma rules to SPL
         run: |
-          python scripts/sigma2splunk.py --test-all --no-test
-          echo "Conversion complete"
+          if [ "${{ github.event.inputs.force_all }}" = "true" ]; then
+            python scripts/sigma2splunk.py --test-all --no-test
+          else
+            # Only convert rules that changed (git diff)
+            CHANGED_RULES=$(git diff --name-only HEAD~1 HEAD -- 'rules/' 2>/dev/null || echo "")
+            if [ -n "$CHANGED_RULES" ]; then
+              echo "Changed rules:"
+              echo "$CHANGED_RULES"
+              echo "$CHANGED_RULES" | while read rule; do
+                if [ -f "$rule" ]; then
+                  python scripts/sigma2splunk.py "$rule" --no-test
+                fi
+              done
+            else
+              echo "No rule files changed in this push"
+            fi
+          fi
 
-      - name: Deploy saved searches to Splunk
+      - name: Deploy to Splunk (git diff sync)
         run: |
-          python scripts/deploy_to_splunk.py
+          DEPLOY_ARGS=""
+          if [ "${{ github.event.inputs.force_all }}" = "true" ]; then
+            DEPLOY_ARGS="--force-all"
+          fi
+          if [ "${{ github.event.inputs.dry_run }}" = "true" ]; then
+            DEPLOY_ARGS="$DEPLOY_ARGS --dry-run"
+          fi
+          python scripts/deploy_to_splunk.py $DEPLOY_ARGS
         env:
           SPLUNK_HOST: localhost
           SPLUNK_PORT: 8089
           SPLUNK_USER: admin
           SPLUNK_PASS: ChangeMeNow1!
+          N8N_WEBHOOK_URL: http://localhost:5678/webhook/splunk-alert
 
-      - name: Commit converted SPL files
+      - name: Commit state and SPL files
+        if: ${{ github.event.inputs.dry_run != 'true' }}
         run: |
           git config user.name "GitHub Actions Bot"
           git config user.email "actions@github.com"
-          git add splunk/savedsearches/
-          git diff --staged --quiet || git commit -m "Auto-deploy: Convert Sigma rules to SPL [skip ci]"
+          git add splunk/savedsearches/ .deploy_state.json
+          git diff --staged --quiet || git commit -m "Auto-deploy: sync detection rules [skip ci]"
           git push || true
