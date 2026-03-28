@@ -1,0 +1,49 @@
+name: Deploy Detection Rules to Splunk
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'rules/**'          # Only trigger when rules change
+      - 'scripts/**'        # Or when scripts change
+
+  workflow_dispatch:         # Allow manual trigger from GitHub UI
+
+jobs:
+  convert-and-deploy:
+    runs-on: self-hosted     # Runs on your soc-stack runner
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: |
+          pip install pySigma pySigma-backend-splunk pySigma-pipeline-sysmon pySigma-pipeline-splunk PyYAML requests
+
+      - name: Convert all Sigma rules to SPL
+        run: |
+          python scripts/sigma2splunk.py --test-all --no-test
+          echo "Conversion complete"
+
+      - name: Deploy saved searches to Splunk
+        run: |
+          python scripts/deploy_to_splunk.py
+        env:
+          SPLUNK_HOST: localhost
+          SPLUNK_PORT: 8089
+          SPLUNK_USER: admin
+          SPLUNK_PASS: ChangeMeNow1!
+
+      - name: Commit converted SPL files
+        run: |
+          git config user.name "GitHub Actions Bot"
+          git config user.email "actions@github.com"
+          git add splunk/savedsearches/
+          git diff --staged --quiet || git commit -m "Auto-deploy: Convert Sigma rules to SPL [skip ci]"
+          git push || true
