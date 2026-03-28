@@ -80,7 +80,7 @@ Write Sigma Rule ──> Test Locally ──> Push to GitHub ──> Auto-Deploy
 - pySigma and Splunk backend installed:
 
 ```bash
-pip install pySigma pySigma-backend-splunk pySigma-pipeline-sysmon pySigma-pipeline-splunk PyYAML requests
+pip install pySigma pySigma-backend-splunk pySigma-pipeline-sysmon PyYAML requests
 ```
 
 ### Convert and test a single rule
