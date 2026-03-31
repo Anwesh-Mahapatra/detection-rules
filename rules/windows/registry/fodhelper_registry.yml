@@ -8,10 +8,6 @@ logsource:
     product: windows
 detection:
     selection:
-        EventID: 
-            - 12
-            - 13
-            - 14
         TargetObject|contains:
             - '\Software\Classes\ms-settings\Shell\Open\command'
             - '\Software\Classes\ms-settings\CurVer'

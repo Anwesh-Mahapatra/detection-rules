@@ -584,7 +584,7 @@ def process_single_rule(sigma_file_path, skip_test=False):
         return True
 
     # Step 3: Test against Splunk
-    search_result = run_splunk_search(result['spl_query'])
+    search_result = run_splunk_search(result['spl_query'], earliest=SEARCH_EARLIEST, latest=SEARCH_LATEST)
 
     if search_result is None:
         print(f"\n{Colors.YELLOW}[!] Could not connect to Splunk — skipping live test{Colors.END}")
