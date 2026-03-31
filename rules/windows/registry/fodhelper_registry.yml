@@ -1,0 +1,25 @@
+title: Fodhelper Registry Hijack Setup
+status: experimental
+description: Detects the creation or modification of registry keys used to hijack Fodhelper.exe for UAC bypass.
+author: Anwesh
+date: 2026-04-01
+logsource:
+    category: registry_event
+    product: windows
+detection:
+    selection:
+        EventID: 
+            - 12
+            - 13
+            - 14
+        TargetObject|contains:
+            - '\Software\Classes\ms-settings\Shell\Open\command'
+            - '\Software\Classes\ms-settings\CurVer'
+    condition: selection
+falsepositives:
+    - Extremely rare. Legitimate software does not arbitrarily modify the ms-settings user-level protocol handler.
+level: critical
+tags:
+    - attack.privilege_escalation
+    - attack.defense_evasion
+    - attack.t1548.002
