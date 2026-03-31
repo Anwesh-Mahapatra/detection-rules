@@ -1,0 +1,37 @@
+Fodhelper UAC Bypass
+---------------------------------------
+- (Basic) Understanding File Execution in Windows:-
+
+	- When a file is double clicked -> Windows checks for the file extension in HKEY_CLASSES_ROOT
+	- It specifically looks for a ProgID
+	- ProgID links a file extension to the application or the component that should handle it
+	- After progID is identified windows looks for HKEY_CLASSES_ROOT\<ProgID>
+	- Then it looks for HKEY_CLASSES_ROOT\<ProgID>\shell\open\command
+	- In that command you might have the application name that executes or opens or edits the file
+	- If the user has set some different application to open the file
+		- Windows checks the path HKEY_CURRENT_USER\Software\Classes\ms-settings\Shell\Open\Command
+		- Let's say for example there is a .html file, you double click it. Then windows will look at 2 locations
+			- HKEY_CLASSES_ROOT and HKEY_CURRENT_USER 
+			- HKEY_CURRENT_USER will be looked upon to check if the user has set any specific application to open the file
+			- Or else HKEY_CLASSES_ROOT will be looked upon and the html file will open with default app i.e Edge
+
+- Fodhelper.exe
+	- Introduced in windows10 to manage optional features (region specific keyboard settings etc...)
+	- Located at C:\Windows\System32\fodhelper.exe
+	- It has the autoelevate flag set by default i.e it is designed to run with elevated priv
+	- Autoelevate does not require User Access Control(UAC)
+	- It looks for HKEY_CURRENT_USER\Software\Classes\ms-settings\Shell\Open\command coz it executes .exe like we gave an example of .html
+	- So the exploit may contain the following steps
+		- Addition of HKEY_CURRENT_USER\Software\Classes\ms-settings\Shell\Open\command via powershell or other means
+		- Then the value of HKEY_CURRENT_USER\Software\Classes\ms-settings\Shell\Open\command can be overriden to have cmd.exe
+		- Fodhelper.exe also checks for DelegateExecute value in HKEY_CURRENT_USER\Software\Classes\ms-settings\Shell\Open\command so that can be overriden as well. So fodhelper is designed to look for a COM object, by overriding the DelegateExecute to be empty, it falls back to HKEY_CURRENT_USER\Software\Classes\ms-settings\Shell\Open\command
+		- To bypass defender or edr, you can make a copy of C:\Windows\System32\cmd.exe and name to something else and then set that value to HKEY_CURRENT_USER\Software\Classes\ms-settings\Shell\Open\command
+
+	(Advanced) A stealthier attack:-
+		- Because defenders and EDRs started heavily monitoring the exact HKEY_CURRENT_USER\Software\Classes\ms-settings\Shell\Open\command registry path, attackers adapted by using the CurVer (Current Version) subkey
+		- Instead of writing the payload directly to the ms-settings key
+			- Create HKCU\Software\Classes\ms-settings\CurVer and set its default value to a custom, fake ProgID
+			- Create HKCU\Software\Classes\<fake_prog_id>\Shell\Open\command and place the payload (cmd.exe) there.
+
+SigmaHq Detection:-
+	https://github.com/SigmaHQ/sigma/blob/master/rules/windows/process_creation/proc_creation_win_uac_bypass_fodhelper.yml

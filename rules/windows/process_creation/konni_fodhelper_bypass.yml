@@ -1,0 +1,24 @@
+title: APT KONNI Suspicious Fodhelper UAC Bypass
+status: experimental
+description: Detects powershell.exe or cmd.exe spawning fodhelper.exe to bypass UAC.
+author: Anwesh
+date: 2026-03-31
+logsource:
+    category: process_creation
+    product: windows
+detection:
+    selection:
+        EventID: 1
+        Image|endswith: '\fodhelper.exe'
+        ParentImage|endswith:
+            - '\powershell.exe'
+            - '\cmd.exe'
+            - '\pwsh.exe'
+    condition: selection
+falsepositives:
+    - Legitimate administrative scripts (rare)
+level: high
+tags:
+    - attack.privilege_escalation
+    - attack.defense_evasion
+    - attack.t1548.002
