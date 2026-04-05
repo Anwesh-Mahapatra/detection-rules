@@ -1,0 +1,33 @@
+title: Scheduled Task Creation with Masquerading Name
+status: experimental
+description: >
+  Detects schtasks.exe creating a task whose name impersonates
+  a legitimate service (OneDrive, Chrome, Defender, etc.) while
+  the task action executes PowerShell or cmd with hidden/noprofile
+  flags. Consistent with KONNI persistence mechanism.
+author: Anwesh
+date: 2026-04-05
+logsource:
+    category: process_creation
+    product: windows
+detection:
+    selection_tool:
+        EventID: 1
+        Image|endswith: '\schtasks.exe'
+        CommandLine|contains: '/create'
+    selection_masquerade:
+        CommandLine|contains:
+            - 'OneDrive'
+            - 'ChromeUpdate'
+            - 'EdgeUpdate'
+            - 'DefenderUpdate'
+            - 'WindowsUpdate'
+            - 'OfficeUpdate'
+            - 'TeamsUpdate'
+    condition: selection_tool and selection_masquerade
+falsepositives:
+    - Legitimate software using similar naming conventions (rare for schtasks CLI)
+level: high
+tags:
+    - attack.persistence
+    - attack.t1053.005

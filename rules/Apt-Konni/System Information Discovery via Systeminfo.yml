@@ -1,0 +1,24 @@
+title: System Information Discovery via Systeminfo
+status: experimental
+description: >
+  Detects execution of systeminfo.exe, commonly used by APT groups
+  including KONNI for host reconnaissance after initial compromise.
+  Alone this is low severity, but combined with other kill chain
+  phases it indicates active compromise.
+author: Anwesh
+date: 2026-04-05
+logsource:
+    category: process_creation
+    product: windows
+detection:
+    selection:
+        EventID: 1
+        Image|endswith: '\systeminfo.exe'
+    condition: selection
+falsepositives:
+    - System administrators running systeminfo manually
+    - Inventory/asset management tools
+level: low
+tags:
+    - attack.discovery
+    - attack.t1082

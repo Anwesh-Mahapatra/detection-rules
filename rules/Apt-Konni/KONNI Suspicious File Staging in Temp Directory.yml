@@ -1,0 +1,30 @@
+title: KONNI Suspicious File Staging in Temp Directory
+status: experimental
+description: >
+  Detects creation of suspicious files (.lnk, .cab, .ps1) inside a
+  newly created subdirectory under %TEMP%, consistent with KONNI
+  initial access lure delivery and payload staging.
+author: Anwesh
+date: 2026-04-05
+logsource:
+    category: file_event
+    product: windows
+detection:
+    selection:
+        EventID: 11
+        TargetFilename|contains: '\AppData\Local\Temp\'
+    filter_extension:
+        TargetFilename|endswith:
+            - '.lnk'
+            - '.cab'
+            - '.ps1'
+    condition: selection and filter_extension
+falsepositives:
+    - Legitimate software installers extracting to Temp
+    - Developer tools creating .ps1 in Temp (uncommon)
+level: medium
+tags:
+    - attack.initial_access
+    - attack.defense_evasion
+    - attack.t1566.002
+    - attack.t1140

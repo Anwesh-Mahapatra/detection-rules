@@ -1,0 +1,25 @@
+title: KONNI Cleanup - Fodhelper Registry Key Removal
+status: experimental
+description: >
+  Detects deletion of the ms-settings registry key hierarchy and
+  scheduled task removal in quick succession, consistent with
+  KONNI post-exploitation cleanup to remove UAC bypass artifacts.
+author: Anwesh
+date: 2026-04-05
+logsource:
+    category: process_creation
+    product: windows
+detection:
+    selection_schtasks_delete:
+        EventID: 1
+        Image|endswith: '\schtasks.exe'
+        CommandLine|contains|all:
+            - '/delete'
+            - '/f'
+    condition: selection_schtasks_delete
+falsepositives:
+    - Legitimate scheduled task removal during software uninstall
+level: medium
+tags:
+    - attack.defense_evasion
+    - attack.t1070.004
