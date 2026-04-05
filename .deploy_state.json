@@ -1,13 +1,21 @@
 {
-  "last_deploy": "2026-04-05T15:19:40.947649+00:00",
+  "last_deploy": "2026-04-05T15:33:48.794812+00:00",
   "deployed_rules": {
+    "rules/Apt-Konni/Fodhelper Registry Hijack Setup.yml": {
+      "content_hash": "848016e8e606c9f74422f75a576fa0338065361d0d7f9d6e16b0509aaa2f43b3",
+      "spl_file": "splunk/savedsearches/Fodhelper_Registry_Hijack_Setup.yml",
+      "splunk_search_name": "Detection: Fodhelper Registry Hijack Setup",
+      "rule_title": "Fodhelper Registry Hijack Setup",
+      "rule_level": "critical",
+      "deployed_at": "2026-04-05T15:33:46.161537+00:00"
+    },
     "rules/Apt-Konni/KONNI Cleanup - Fodhelper Registry Key Removal.yml": {
       "content_hash": "1bc1386e5a337fff71c2f5e53b7e3db4d3a6f9f7a5ab7a4696eebd24b42fd890",
       "spl_file": "splunk/savedsearches/KONNI_Cleanup_-_Fodhelper_Registry_Key_Removal.yml",
       "splunk_search_name": "Detection: KONNI Cleanup - Fodhelper Registry Key Removal",
       "rule_title": "KONNI Cleanup - Fodhelper Registry Key Removal",
       "rule_level": "medium",
-      "deployed_at": "2026-04-05T11:39:17.656071+00:00"
+      "deployed_at": "2026-04-05T15:33:46.683801+00:00"
     },
     "rules/Apt-Konni/KONNI Suspicious File Staging in Temp Directory.yml": {
       "content_hash": "2e572ace18ecd34605f951dedb3577f8e95305ef5b1a8c182f5b7f3ded081431",
@@ -15,7 +23,7 @@
       "splunk_search_name": "Detection: KONNI Suspicious File Staging in Temp Directory",
       "rule_title": "KONNI Suspicious File Staging in Temp Directory",
       "rule_level": "medium",
-      "deployed_at": "2026-04-05T11:39:18.685566+00:00"
+      "deployed_at": "2026-04-05T15:33:47.207252+00:00"
     },
     "rules/Apt-Konni/Scheduled Task Creation with Masquerading Name.yml": {
       "content_hash": "0908ee304083681bd5633978615cb96091055fb40d07bf19583bd809e8d78f31",
@@ -23,23 +31,7 @@
       "splunk_search_name": "Detection: Scheduled Task Creation with Masquerading Name",
       "rule_title": "Scheduled Task Creation with Masquerading Name",
       "rule_level": "high",
-      "deployed_at": "2026-04-05T11:39:19.719963+00:00"
-    },
-    "rules/Apt-Konni/System Information Discovery via Systeminfo.yml": {
-      "content_hash": "e5c69ee669720b953b2063b08b0425702defd2f8a944e1f1305a8f256ebace13",
-      "spl_file": "splunk/savedsearches/System_Information_Discovery_via_Systeminfo.yml",
-      "splunk_search_name": "Detection: System Information Discovery via Systeminfo",
-      "rule_title": "System Information Discovery via Systeminfo",
-      "rule_level": "low",
-      "deployed_at": "2026-04-05T11:39:20.736669+00:00"
-    },
-    "rules/Apt-Konni/Fodhelper Registry Hijack Setup.yml": {
-      "content_hash": "de5d3a3878711644888c6b9acd0d128c0d37b51c34552059afbe804a592c7b98",
-      "spl_file": "splunk/savedsearches/Fodhelper_Registry_Hijack_Setup.yml",
-      "splunk_search_name": "Detection: Fodhelper Registry Hijack Setup",
-      "rule_title": "Fodhelper Registry Hijack Setup",
-      "rule_level": "critical",
-      "deployed_at": "2026-04-05T11:39:21.790365+00:00"
+      "deployed_at": "2026-04-05T15:33:47.738384+00:00"
     },
     "rules/Apt-Konni/Suspicious Fodhelper UAC Bypass.yml": {
       "content_hash": "3a8cd8f9e7e8ec4b7f77d4ed30d690e8502818986a8445660f8bfa332645912a",
@@ -47,7 +39,15 @@
       "splunk_search_name": "Detection: APT KONNI Suspicious Fodhelper UAC Bypass",
       "rule_title": "APT KONNI Suspicious Fodhelper UAC Bypass",
       "rule_level": "high",
-      "deployed_at": "2026-04-05T11:39:22.812037+00:00"
+      "deployed_at": "2026-04-05T15:33:48.269638+00:00"
+    },
+    "rules/Apt-Konni/System Information Discovery via Systeminfo.yml": {
+      "content_hash": "e5c69ee669720b953b2063b08b0425702defd2f8a944e1f1305a8f256ebace13",
+      "spl_file": "splunk/savedsearches/System_Information_Discovery_via_Systeminfo.yml",
+      "splunk_search_name": "Detection: System Information Discovery via Systeminfo",
+      "rule_title": "System Information Discovery via Systeminfo",
+      "rule_level": "low",
+      "deployed_at": "2026-04-05T15:33:48.794793+00:00"
     }
   }
 }

@@ -11,8 +11,8 @@ description: 'Detects deletion of the ms-settings registry key hierarchy and sch
   '
 spl_query: index="sysmon" source="XmlWinEventLog:Microsoft-Windows-Sysmon/Operational"
   EventCode=1 Image="*\\schtasks.exe" CommandLine="*/delete*" CommandLine="*/f*"
-source_sigma_file: .\rules\Apt-Konni\KONNI Cleanup - Fodhelper Registry Key Removal.yml
-converted_at: '2026-04-05T15:08:01.586895+00:00'
+source_sigma_file: rules/Apt-Konni/KONNI Cleanup - Fodhelper Registry Key Removal.yml
+converted_at: '2026-04-05T15:33:46.172345+00:00'
 splunk_saved_search:
   name: 'Detection: KONNI Cleanup - Fodhelper Registry Key Removal'
   search: index="sysmon" source="XmlWinEventLog:Microsoft-Windows-Sysmon/Operational"

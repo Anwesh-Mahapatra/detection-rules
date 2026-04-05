@@ -14,8 +14,8 @@ description: 'Detects creation of suspicious files (.lnk, .cab, .ps1) inside a n
 spl_query: index="sysmon" source="XmlWinEventLog:Microsoft-Windows-Sysmon/Operational"
   EventCode=11 TargetFilename="*\\AppData\\Local\\Temp\\*" (TargetFilename="*.lnk"
   OR TargetFilename="*.cab" OR TargetFilename="*.ps1")
-source_sigma_file: .\rules\Apt-Konni\KONNI Suspicious File Staging in Temp Directory.yml
-converted_at: '2026-04-05T15:08:04.554736+00:00'
+source_sigma_file: rules/Apt-Konni/KONNI Suspicious File Staging in Temp Directory.yml
+converted_at: '2026-04-05T15:33:46.696528+00:00'
 splunk_saved_search:
   name: 'Detection: KONNI Suspicious File Staging in Temp Directory'
   search: index="sysmon" source="XmlWinEventLog:Microsoft-Windows-Sysmon/Operational"
