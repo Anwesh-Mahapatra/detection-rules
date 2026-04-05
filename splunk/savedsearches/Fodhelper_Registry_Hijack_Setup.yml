@@ -8,15 +8,15 @@ mitre_attack:
 description: Detects the creation or modification of registry keys used to hijack
   Fodhelper.exe for UAC bypass.
 spl_query: index="sysmon" source="XmlWinEventLog:Microsoft-Windows-Sysmon/Operational"
-  EventCode IN (12, 13, 14) (TargetObject="*ms-settings\\Shell\\Open\\command*" OR
-  TargetObject="*ms-settings\\CurVer*")
-source_sigma_file: .\rules\Apt-Konni\Fodhelper Registry Hijack Setup.yml
-converted_at: '2026-04-05T15:13:54.871244+00:00'
+  EventCode IN (12, 13, 14) TargetObject IN ("*ms-settings\\Shell\\Open\\command*",
+  "*ms-settings\\CurVer*")
+source_sigma_file: rules/Apt-Konni/Fodhelper Registry Hijack Setup.yml
+converted_at: '2026-04-05T15:17:59.394717+00:00'
 splunk_saved_search:
   name: 'Detection: Fodhelper Registry Hijack Setup'
   search: index="sysmon" source="XmlWinEventLog:Microsoft-Windows-Sysmon/Operational"
-    EventCode IN (12, 13, 14) (TargetObject="*ms-settings\\Shell\\Open\\command*"
-    OR TargetObject="*ms-settings\\CurVer*")
+    EventCode IN (12, 13, 14) TargetObject IN ("*ms-settings\\Shell\\Open\\command*",
+    "*ms-settings\\CurVer*")
   cron_schedule: '* * * * *'
   is_scheduled: true
   alert_type: number of events
