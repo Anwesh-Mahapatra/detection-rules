@@ -9,8 +9,8 @@ logsource:
 detection:
     selection:
         TargetObject|contains:
-            - '\Software\Classes\ms-settings\Shell\Open\command'
-            - '\Software\Classes\ms-settings\CurVer'
+            - 'ms-settings\Shell\Open\command'
+            - 'ms-settings\CurVer'
     condition: selection
 falsepositives:
     - Extremely rare. Legitimate software does not arbitrarily modify the ms-settings user-level protocol handler.

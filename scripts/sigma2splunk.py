@@ -26,7 +26,7 @@ import time
 import argparse
 import urllib3 # type: ignore
 from pathlib import Path
-from datetime import datetime
+from datetime import datetime, timezone
 
 # Suppress SSL warnings for self-signed Splunk certs
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
@@ -74,6 +74,107 @@ def print_banner():
     ║        Detection-as-Code Pipeline v1.0                ║
     ╚═══════════════════════════════════════════════════════╝{Colors.END}
     """)
+
+# ============================================================
+# SPL POST-PROCESSING (fix pySigma output bugs)
+# ============================================================
+def post_process_spl(spl_query):
+    """
+    Fixes common issues in pySigma-generated SPL queries.
+
+    Known bugs this handles:
+    1. field IN ("*wildcard*", ...) — Splunk IN does NOT support wildcards.
+       Fix: convert to (field="*wildcard*" OR field="*wildcard2*")
+    2. Duplicate EventCode=X EventCode=X
+    3. field IN (...) with single value — simplify to field="value"
+    4. Unnecessary quoting of simple integers
+    """
+    import re
+
+    # ------------------------------------------------------------------
+    # Fix 1: field IN ("*wildcard*", ...) → (field="*w1*" OR field="*w2*")
+    #
+    # Splunk's IN operator only does exact matching. When pySigma generates
+    # TargetObject IN ("*\\ms-settings\\*", "*\\CurVer*"), Splunk tries
+    # exact match against the literal string including asterisks, which
+    # obviously never matches.
+    #
+    # We detect any IN() where at least one value contains a wildcard (*)
+    # and rewrite the entire IN clause to OR'd wildcard comparisons.
+    # ------------------------------------------------------------------
+    def fix_in_with_wildcards(match):
+        field = match.group(1)
+        values_str = match.group(2)
+
+        # Parse the values out of the IN(...) clause
+        # Handle both "quoted" and unquoted values
+        values = re.findall(r'"([^"]*)"', values_str)
+        if not values:
+            values = re.findall(r"'([^']*)'", values_str)
+        if not values:
+            # No quoted values, try comma-separated unquoted
+            values = [v.strip() for v in values_str.split(',')]
+
+        # Check if any value has a wildcard
+        has_wildcard = any('*' in v for v in values)
+
+        if not has_wildcard and len(values) > 1:
+            # No wildcards, IN is fine — return as-is
+            return match.group(0)
+
+        if len(values) == 1:
+            # Single value, just use field="value"
+            return f'{field}="{values[0]}"'
+
+        # Multiple values with wildcards — rewrite to OR
+        or_parts = [f'{field}="{v}"' for v in values]
+        return '(' + ' OR '.join(or_parts) + ')'
+
+    # Match: fieldname IN ("val1", "val2", ...) or fieldname IN (val1, val2)
+    in_pattern = r'(\w+)\s+IN\s*\(([^)]+)\)'
+    spl_query = re.sub(in_pattern, fix_in_with_wildcards, spl_query)
+
+    # ------------------------------------------------------------------
+    # Fix 2: Duplicate EventCode=X EventCode=X
+    #
+    # pySigma sometimes emits EventCode twice when both logsource.category
+    # and detection.selection specify EventID/EventCode. Remove duplicates.
+    # ------------------------------------------------------------------
+    # Remove exact duplicate "EventCode=X EventCode=X" (same value)
+    spl_query = re.sub(r'(EventCode[=]\s*\d+)\s+\1', r'\1', spl_query)
+    # Remove exact duplicate "EventCode=X  EventCode=X" with extra spaces
+    spl_query = re.sub(r'(EventCode[=]\s*\d+)\s{2,}\1', r'\1', spl_query)
+
+    # ------------------------------------------------------------------
+    # Fix 3: EventCode IN (X) single value — simplify
+    # ------------------------------------------------------------------
+    single_in = re.match(r'EventCode\s+IN\s*\(\s*(\d+)\s*\)', spl_query)
+    if single_in:
+        spl_query = spl_query.replace(single_in.group(0), f'EventCode={single_in.group(1)}')
+
+    # ------------------------------------------------------------------
+    # Fix 4: Collapse redundant whitespace
+    # ------------------------------------------------------------------
+    spl_query = re.sub(r'  +', ' ', spl_query).strip()
+
+    # ------------------------------------------------------------------
+    # Fix 5: Handle |endswith → ensure trailing wildcard is NOT present
+    #         and |startswith → ensure leading wildcard is NOT present
+    #         pySigma usually handles these but double-check
+    # ------------------------------------------------------------------
+    # These are typically correct from pySigma, no action needed
+
+    # ------------------------------------------------------------------
+    # Fix 6: field="*\\value*" escaping
+    #
+    # pySigma may double-escape backslashes. In Splunk SPL, a single
+    # backslash in a wildcard search should be \\, but pySigma sometimes
+    # produces \\\\. Fix quadruple backslashes to double.
+    # ------------------------------------------------------------------
+    spl_query = spl_query.replace('\\\\\\\\', '\\\\')
+
+    return spl_query
+
 
 # ============================================================
 # SIGMA CONVERSION
@@ -140,6 +241,9 @@ def convert_sigma_to_spl(sigma_file_path):
 
         spl_query = spl_queries[0]  # First query (usually there's only one)
 
+        # Post-process to fix common pySigma output bugs
+        spl_query = post_process_spl(spl_query)
+
         # Fix source name and add index for our Splunk environment
         spl_query = spl_query.replace(
             'source="WinEventLog:Microsoft-Windows-Sysmon/Operational"',
@@ -154,6 +258,25 @@ def convert_sigma_to_spl(sigma_file_path):
             'source="WinEventLog:System"',
             'index="windows" source="WinEventLog:System"'
         )
+        spl_query = spl_query.replace(
+            'source="WinEventLog:Application"',
+            'index="windows" source="WinEventLog:Application"'
+        )
+        spl_query = spl_query.replace(
+            'source="WinEventLog:Microsoft-Windows-PowerShell/Operational"',
+            'index="windows" source="WinEventLog:Microsoft-Windows-PowerShell/Operational"'
+        )
+        spl_query = spl_query.replace(
+            'source="WinEventLog:Microsoft-Windows-TaskScheduler/Operational"',
+            'index="windows" source="WinEventLog:Microsoft-Windows-TaskScheduler/Operational"'
+        )
+        # Fallback: if pySigma only emitted source= without index, and none
+        # of the above matched, check if we need to add an index prefix
+        if 'index=' not in spl_query and 'source="' in spl_query:
+            if 'Sysmon' in spl_query:
+                spl_query = 'index="sysmon" ' + spl_query
+            else:
+                spl_query = 'index="windows" ' + spl_query
 
         print(f"\n  {Colors.GREEN}[+] Converted SPL query:{Colors.END}")
         print(f"  {Colors.CYAN}────────────────────────────────────────{Colors.END}")
@@ -531,6 +654,21 @@ def save_spl_file(conversion_result):
 
     # Save as a YAML file containing both the SPL and metadata
     # GitHub Actions will read this to create Splunk saved searches
+    # Set schedule based on severity
+    level = conversion_result['rule_level']
+    schedule_map = {
+        'critical': '* * * * *',       # Every minute
+        'high': '*/3 * * * *',         # Every 3 minutes
+        'medium': '*/5 * * * *',       # Every 5 minutes
+        'low': '*/15 * * * *',         # Every 15 minutes
+        'informational': '*/30 * * * *' # Every 30 minutes
+    }
+    cron = schedule_map.get(level, '*/5 * * * *')
+    dispatch_earliest = {
+        'critical': '-1m', 'high': '-3m', 'medium': '-5m',
+        'low': '-15m', 'informational': '-30m'
+    }.get(level, '-5m')
+
     output = {
         'rule_title': conversion_result['rule_title'],
         'rule_id': conversion_result['rule_id'],
@@ -539,16 +677,16 @@ def save_spl_file(conversion_result):
         'description': conversion_result['description'],
         'spl_query': conversion_result['spl_query'],
         'source_sigma_file': conversion_result['source_file'],
-        'converted_at': datetime.utcnow().isoformat(),
+        'converted_at': datetime.now(timezone.utc).isoformat(),
         'splunk_saved_search': {
             'name': f"Detection: {conversion_result['rule_title']}",
             'search': conversion_result['spl_query'],
-            'cron_schedule': '*/5 * * * *',  # Every 5 minutes
+            'cron_schedule': cron,
             'is_scheduled': True,
             'alert_type': 'number of events',
             'alert_threshold': 0,
             'alert_comparator': 'greater than',
-            'dispatch_earliest_time': '-5m',
+            'dispatch_earliest_time': dispatch_earliest,
             'dispatch_latest_time': 'now'
         }
     }
@@ -558,6 +696,181 @@ def save_spl_file(conversion_result):
 
     print(f"\n  {Colors.GREEN}[+] Saved SPL to: {spl_file_path}{Colors.END}")
     return spl_file_path
+
+
+# ============================================================
+# SMART VALIDATION — Auto-detect field value mismatches
+# ============================================================
+def smart_validate_wildcards(spl_query):
+    """
+    When a query returns 0 results, this function figures out WHY.
+
+    For each field="*pattern*" in the query, it:
+    1. Queries Splunk for actual values of that field
+    2. Checks if the pattern matches any real value
+    3. If not, finds the closest matching value and suggests a fix
+    4. Returns a corrected query
+
+    This catches the classic Sigma → Splunk mismatch where Sigma
+    uses HKCU\\Software\\Classes\\... but Sysmon logs it as
+    HKU\\<SID>_Classes\\...
+    """
+    import re
+    import requests  # type: ignore
+
+    base_url = f"https://{SPLUNK_HOST}:{SPLUNK_PORT}"
+
+    # Extract field="*pattern*" pairs from the query
+    # Match: FieldName="*something*"
+    pattern = re.compile(r'(\w+)="(\*[^"]+\*)"')
+    wildcard_fields = pattern.findall(spl_query)
+
+    if not wildcard_fields:
+        return spl_query, []
+
+    # Determine which index/source to query from the SPL
+    index_match = re.search(r'index="?(\w+)"?', spl_query)
+    index_name = index_match.group(1) if index_match else "sysmon"
+
+    # Get the EventCode filter to narrow our sample query
+    ec_match = re.search(r'EventCode\s*(?:=|IN\s*\()\s*(\d[\d,\s]*)', spl_query)
+
+    fixes = []
+    corrected_query = spl_query
+
+    for field_name, pattern_value in wildcard_fields:
+        # Skip fields that are just simple suffix matches like Image="*\fodhelper.exe"
+        # These are almost always correct
+        inner = pattern_value.strip('*')
+        if '\\' not in inner and '/' not in inner:
+            continue  # Simple filename match, skip
+        # Count path segments - only validate complex paths (3+ segments)
+        segments = [s for s in inner.replace('/', '\\').split('\\') if s]
+        if len(segments) < 3:
+            continue  # Short pattern, likely fine
+
+        print(f"\n  {Colors.BLUE}[*] Validating {field_name} pattern: {pattern_value}{Colors.END}")
+
+        # Extract the most specific/unique part of the pattern for a broader search
+        # e.g., from "*\\Software\\Classes\\ms-settings\\Shell\\Open\\command*"
+        # extract "ms-settings" as the distinctive keyword
+        parts = [p for p in inner.replace('/', '\\').split('\\') if p and len(p) > 3]
+        if not parts:
+            continue
+
+        # Use the most distinctive part (longest, most unique-looking)
+        distinctive = max(parts, key=len)
+
+        # Build a broader query to find actual values
+        broad_query = f'search index={index_name}'
+        if ec_match:
+            ec_val = ec_match.group(1).strip()
+            if ',' in ec_val:
+                broad_query += f' EventCode IN ({ec_val})'
+            else:
+                broad_query += f' EventCode={ec_val}'
+        broad_query += f' {field_name}="*{distinctive}*"'
+        broad_query += f' | stats count by {field_name} | head 10'
+
+        print(f"    Broader search: {broad_query[:100]}...")
+
+        try:
+            resp = requests.post(
+                f"{base_url}/services/search/jobs",
+                auth=(SPLUNK_USER, SPLUNK_PASS),
+                verify=False,
+                data={
+                    'search': broad_query,
+                    'earliest_time': '0',  # All time
+                    'latest_time': 'now',
+                    'output_mode': 'json',
+                    'exec_mode': 'blocking'
+                }
+            )
+
+            if resp.status_code != 201:
+                print(f"    {Colors.YELLOW}Could not run validation query{Colors.END}")
+                continue
+
+            sid = resp.json()['sid']
+            results_resp = requests.get(
+                f"{base_url}/services/search/jobs/{sid}/results",
+                auth=(SPLUNK_USER, SPLUNK_PASS),
+                verify=False,
+                params={'output_mode': 'json', 'count': 10}
+            )
+
+            results = results_resp.json().get('results', [])
+
+            if not results:
+                print(f"    {Colors.YELLOW}No data found for {field_name} containing '{distinctive}'{Colors.END}")
+                continue
+
+            # We found actual values — check if our pattern matches
+            actual_values = [r.get(field_name, '') for r in results if r.get(field_name)]
+
+            print(f"    {Colors.GREEN}Found {len(actual_values)} actual values in Splunk:{Colors.END}")
+            for av in actual_values[:5]:
+                print(f"      → {av[:120]}")
+
+            # Check if original pattern matches any actual value
+            # Convert SPL wildcard pattern to regex for matching
+            regex_pattern = pattern_value.replace('\\\\', '\\').replace('*', '.*')
+            try:
+                compiled = re.compile(regex_pattern, re.IGNORECASE)
+                matches = [av for av in actual_values if compiled.search(av)]
+            except re.error:
+                matches = []
+
+            if matches:
+                print(f"    {Colors.GREEN}✓ Pattern matches actual data — no fix needed{Colors.END}")
+                continue
+
+            # Pattern doesn't match — generate a fix
+            # Find the common substring between our pattern and actual values
+            # Strategy: use the distinctive parts that appear in actual values
+            # and build a simpler wildcard
+
+            # Extract the key parts from actual values
+            # e.g., actual: "HKU\..._Classes\ms-settings\Shell\Open\command\(Default)"
+            # We want: "*ms-settings*Shell*Open*command*"
+            sample = actual_values[0]
+
+            # Find where our distinctive keyword appears in the actual value
+            idx = sample.lower().find(distinctive.lower())
+            if idx >= 0:
+                # Get the relevant suffix starting from the distinctive part
+                relevant_part = sample[idx:]
+                # Build a simpler wildcard using the key path segments
+                key_parts = [p for p in relevant_part.replace('/', '\\').split('\\') if p]
+                # Join with * to make a flexible wildcard
+                new_pattern = '*' + '*'.join(key_parts[:4]) + '*'
+                # Also prepend * for the leading match
+                new_pattern = '*' + new_pattern.lstrip('*')
+
+                print(f"\n    {Colors.RED}✗ Pattern MISMATCH detected!{Colors.END}")
+                print(f"    {Colors.RED}  Your pattern:  {pattern_value}{Colors.END}")
+                print(f"    {Colors.GREEN}  Fixed pattern: {new_pattern}{Colors.END}")
+                print(f"    {Colors.DIM if hasattr(Colors, 'DIM') else ''}  Actual value:  {sample[:120]}{Colors.END}")
+
+                fixes.append({
+                    'field': field_name,
+                    'old_pattern': pattern_value,
+                    'new_pattern': new_pattern,
+                    'actual_sample': sample
+                })
+
+                # Apply fix to the query
+                corrected_query = corrected_query.replace(
+                    f'{field_name}="{pattern_value}"',
+                    f'{field_name}="{new_pattern}"'
+                )
+
+        except Exception as e:
+            print(f"    {Colors.RED}Validation error: {e}{Colors.END}")
+            continue
+
+    return corrected_query, fixes
 
 
 # ============================================================
@@ -679,6 +992,34 @@ def process_single_rule(sigma_file_path, skip_test=False):
         splunk_url = f"http://{SPLUNK_HOST}:{SPLUNK_WEB_PORT}/en-US/app/search/search?q=search%20{explore_query}%20%7C%20head%2020&earliest=-24h&latest=now"
         print(f"\n  {Colors.BLUE}[→] Explore data in Splunk:{Colors.END}")
         print(f"  {splunk_url}")
+
+        # Smart validation: check if wildcard patterns match actual data
+        print(f"\n  {Colors.BOLD}Running smart pattern validation...{Colors.END}")
+        corrected_query, fixes = smart_validate_wildcards(result['spl_query'])
+
+        if fixes:
+            print(f"\n  {Colors.GREEN}{'═' * 50}{Colors.END}")
+            print(f"  {Colors.GREEN}[+] AUTO-FIX: {len(fixes)} pattern(s) corrected{Colors.END}")
+            print(f"  {Colors.GREEN}{'═' * 50}{Colors.END}")
+
+            print(f"\n  {Colors.BOLD}Corrected SPL:{Colors.END}")
+            print(f"  {Colors.CYAN}{corrected_query}{Colors.END}")
+
+            # Re-test the corrected query
+            print(f"\n  {Colors.BLUE}[*] Testing corrected query...{Colors.END}")
+            retest = run_splunk_search(corrected_query, earliest='0', latest='now')
+            if retest and retest['result_count'] > 0:
+                print(f"  {Colors.GREEN}[+] CORRECTED QUERY WORKS: {retest['result_count']} events matched!{Colors.END}")
+
+                # Update the result and re-save
+                result['spl_query'] = corrected_query
+                save_spl_file(result)
+                print(f"  {Colors.GREEN}[+] Saved corrected SPL to: {spl_path}{Colors.END}")
+                return True
+            else:
+                print(f"  {Colors.YELLOW}Corrected query still returned 0 — manual investigation needed{Colors.END}")
+        else:
+            print(f"  {Colors.YELLOW}No auto-fixable pattern issues found — check field names and values manually{Colors.END}")
 
     return result_count > 0
 

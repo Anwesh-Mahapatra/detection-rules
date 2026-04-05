@@ -457,6 +457,12 @@ def run_scheduler(args):
 
     log(f"Splunk connected at {SPLUNK_HOST}:{SPLUNK_PORT}")
 
+    # Lab mode banners
+    if hasattr(args, 'alltime') and args.alltime:
+        log(f"{C.CYAN}▶ ALL-TIME MODE — searching entire index, no time windows{C.END}")
+    if hasattr(args, 'interactive') and args.interactive:
+        log(f"{C.CYAN}▶ INTERACTIVE MODE — will ask before firing each alert{C.END}")
+
     # Process each rule
     stats = {
         'total': len(rules),
@@ -482,13 +488,20 @@ def run_scheduler(args):
             log(f"\n{'─' * 50}")
             log(f"Rule: {rule['title']}")
             log(f"Level: {rule['level']}")
-            log(f"Window: {rule['search_window']}")
+
+        # Override search window in alltime/interactive mode
+        search_window = rule['search_window']
+        if hasattr(args, 'alltime') and args.alltime:
+            search_window = '0'  # Splunk '0' = all time
+
+        if args.verbose:
+            log(f"Window: {search_window}")
             log(f"SPL: {rule['spl_query'][:80]}...")
 
         # Run the search
         results = run_search(
             rule['spl_query'],
-            earliest=rule['search_window'],
+            earliest=search_window,
             latest='now'
         )
 
@@ -513,19 +526,25 @@ def run_scheduler(args):
 
         # We have results — check for duplicates
         stats['with_results'] += 1
-        old_hashes = set(rule_state.get('recent_event_hashes', []))
-        new_results = []
 
-        for event in results:
-            h = event_hash(event)
-            if h not in old_hashes:
-                new_results.append(event)
+        # Skip dedup in alltime mode — treat all results as new
+        if hasattr(args, 'alltime') and args.alltime:
+            new_results = results
+            deduped_count = 0
+        else:
+            old_hashes = set(rule_state.get('recent_event_hashes', []))
+            new_results = []
 
-        deduped_count = len(results) - len(new_results)
-        if deduped_count > 0:
-            stats['deduplicated'] += deduped_count
-            if args.verbose:
-                log(f"  Deduplicated {deduped_count} already-seen events")
+            for event in results:
+                h = event_hash(event)
+                if h not in old_hashes:
+                    new_results.append(event)
+
+            deduped_count = len(results) - len(new_results)
+            if deduped_count > 0:
+                stats['deduplicated'] += deduped_count
+                if args.verbose:
+                    log(f"  Deduplicated {deduped_count} already-seen events")
 
         if len(new_results) == 0:
             if args.verbose:
@@ -552,23 +571,39 @@ def run_scheduler(args):
                 val = str(first[field])[:80]
                 log(f"    {field}: {val}")
 
-        # Fire webhook
-        if fire_alert(rule, new_results, dry_run=args.dry_run):
-            stats['alerts_fired'] += 1
-            rule_state['last_alert_time'] = datetime.now(timezone.utc).isoformat()
-            rule_state['total_alerts'] = rule_state.get('total_alerts', 0) + 1
+        # Interactive mode: ask before firing
+        should_fire = True
+        if hasattr(args, 'interactive') and args.interactive:
+            try:
+                answer = input(f"\n  {C.CYAN}Fire alert for {rule['title']}? [Y/n/q]: {C.END}").strip().lower()
+                if answer == 'q':
+                    log("Aborted by user")
+                    break
+                elif answer == 'n':
+                    should_fire = False
+                    log(f"  {C.DIM}Skipped{C.END}")
+                    stats['skipped'] += 1
+            except (EOFError, KeyboardInterrupt):
+                log("\nAborted")
+                break
 
-        # Update dedup hashes
-        # Keep a rolling window — remove hashes older than DEDUP_WINDOW
-        new_hashes = [event_hash(e) for e in results]
-        # Keep only the last 500 hashes to prevent unbounded growth
-        all_hashes = list(old_hashes) + new_hashes
-        rule_state['recent_event_hashes'] = all_hashes[-500:]
+        # Fire webhook
+        if should_fire:
+            if fire_alert(rule, new_results, dry_run=args.dry_run):
+                stats['alerts_fired'] += 1
+                rule_state['last_alert_time'] = datetime.now(timezone.utc).isoformat()
+                rule_state['total_alerts'] = rule_state.get('total_alerts', 0) + 1
+
+        # Update dedup hashes (skip in alltime mode — state isn't saved anyway)
+        if not (hasattr(args, 'alltime') and args.alltime):
+            new_hashes = [event_hash(e) for e in results]
+            all_hashes = list(old_hashes) + new_hashes
+            rule_state['recent_event_hashes'] = all_hashes[-500:]
 
         sched_state['rules'][rule_name] = rule_state
 
-    # Save state
-    if not args.dry_run:
+    # Save state (skip in alltime mode to keep dedup clean for production runs)
+    if not args.dry_run and not (hasattr(args, 'alltime') and args.alltime):
         save_scheduler_state(sched_state)
 
     # Summary
@@ -580,11 +615,14 @@ def run_scheduler(args):
     log(f"  Rules searched:    {stats['searched']}/{stats['total']}")
     log(f"  With results:      {stats['with_results']}")
     log(f"  Alerts fired:      {stats['alerts_fired']}")
+    log(f"  Skipped:           {stats['skipped']}")
     log(f"  Events deduped:    {stats['deduplicated']}")
     log(f"  Errors:            {stats['errors']}")
     log(f"  Runtime:           {elapsed:.1f}s")
     if args.dry_run:
         log(f"  {C.YELLOW}*** DRY RUN — no webhooks were actually sent ***{C.END}")
+    if hasattr(args, 'alltime') and args.alltime:
+        log(f"  {C.CYAN}*** ALL-TIME MODE — dedup state NOT updated ***{C.END}")
     log("")
 
 
@@ -712,6 +750,9 @@ Examples:
   python3 detection_scheduler.py --verbose           # Detailed output
   python3 detection_scheduler.py --once "PowerShell" # Run one rule
   python3 detection_scheduler.py --status            # Show state
+  python3 detection_scheduler.py --alltime -v        # Search all time (lab mode)
+  python3 detection_scheduler.py -i                  # Interactive: ask before each alert
+  python3 detection_scheduler.py --reset-dedup       # Clear dedup so alerts re-fire
   sudo python3 detection_scheduler.py --install-systemd  # Install as timer
         """
     )
@@ -725,13 +766,30 @@ Examples:
                         help='Show scheduler state and exit')
     parser.add_argument('--install-systemd', action='store_true',
                         help='Install as a systemd timer (requires sudo)')
+    parser.add_argument('--alltime', action='store_true',
+                        help='Search all time instead of narrow windows (lab mode)')
+    parser.add_argument('--interactive', '-i', action='store_true',
+                        help='Ask before firing each alert (implies --alltime --verbose)')
+    parser.add_argument('--reset-dedup', action='store_true',
+                        help='Clear dedup state so alerts can re-fire on existing events')
 
     args = parser.parse_args()
+
+    # --interactive implies --alltime and --verbose
+    if args.interactive:
+        args.alltime = True
+        args.verbose = True
 
     if args.status:
         show_status()
     elif args.install_systemd:
         install_systemd()
+    elif args.reset_dedup:
+        if os.path.exists(SCHEDULER_STATE):
+            os.remove(SCHEDULER_STATE)
+            log(f"Cleared dedup state: {SCHEDULER_STATE}")
+        else:
+            log("No dedup state file found — nothing to clear")
     else:
         run_scheduler(args)
 

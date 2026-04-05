@@ -1,22 +1,22 @@
 {
-  "last_run": "2026-04-05T12:02:38.161251+00:00",
+  "last_run": "2026-04-05T12:06:27.008005+00:00",
   "rules": {
     "Detection: APT KONNI Suspicious Fodhelper UAC Bypass": {
-      "last_searched": "2026-04-05T12:02:09.974394+00:00",
+      "last_searched": "2026-04-05T12:06:15.509371+00:00",
       "last_alert_time": null,
       "total_alerts": 0,
       "recent_event_hashes": [],
       "consecutive_failures": 0
     },
     "Detection: Fodhelper Registry Hijack Setup": {
-      "last_searched": "2026-04-05T12:02:11.830085+00:00",
+      "last_searched": "2026-04-05T12:06:18.345795+00:00",
       "last_alert_time": null,
       "total_alerts": 0,
       "recent_event_hashes": [],
       "consecutive_failures": 0
     },
     "Detection: KONNI Cleanup - Fodhelper Registry Key Removal": {
-      "last_searched": "2026-04-05T12:02:16.537323+00:00",
+      "last_searched": "2026-04-05T12:06:21.169848+00:00",
       "last_alert_time": null,
       "total_alerts": 0,
       "recent_event_hashes": [
@@ -25,7 +25,7 @@
       "consecutive_failures": 0
     },
     "Detection: KONNI Suspicious File Staging in Temp Directory": {
-      "last_searched": "2026-04-05T12:02:23.467930+00:00",
+      "last_searched": "2026-04-05T12:06:24.011533+00:00",
       "last_alert_time": null,
       "total_alerts": 0,
       "recent_event_hashes": [
@@ -34,7 +34,7 @@
       "consecutive_failures": 0
     },
     "Detection: Scheduled Task Creation with Masquerading Name": {
-      "last_searched": "2026-04-05T12:02:29.440220+00:00",
+      "last_searched": "2026-04-05T12:06:25.235666+00:00",
       "last_alert_time": null,
       "total_alerts": 0,
       "recent_event_hashes": [],
@@ -48,7 +48,7 @@
       "consecutive_failures": 0
     },
     "Detection: System Information Discovery via Systeminfo": {
-      "last_searched": "2026-04-05T12:02:34.084860+00:00",
+      "last_searched": "2026-04-05T12:06:27.007649+00:00",
       "last_alert_time": null,
       "total_alerts": 0,
       "recent_event_hashes": [
