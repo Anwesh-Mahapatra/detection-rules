@@ -78,7 +78,7 @@ SPLUNK_API = f"https://{SPLUNK_HOST}:{SPLUNK_PORT}"
 # n8n webhook for alert forwarding
 N8N_WEBHOOK_URL = os.environ.get(
     'N8N_WEBHOOK_URL',
-    'http://localhost:5678/webhook/splunk-alert'
+    'http://192.168.0.8:5678/webhook/splunk-alert'
 )
 
 # Paths
