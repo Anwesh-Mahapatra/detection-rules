@@ -319,6 +319,7 @@ def convert_sigma_file(sigma_path):
         dict with spl_query, rule_title, rule_id, etc.
         None if conversion fails.
     """
+    import re
     from sigma.collection import SigmaCollection # type: ignore
     from sigma.backends.splunk import SplunkBackend # type: ignore
     from sigma.pipelines.sysmon import sysmon_pipeline # type: ignore
@@ -348,7 +349,35 @@ def convert_sigma_file(sigma_path):
 
         spl_query = spl_queries[0]
 
-        # Apply environment-specific fixes
+        # ── Post-process pySigma output ──
+        # Fix 1: field IN ("*wildcard*") → (field="*w1*" OR field="*w2*")
+        def fix_in_with_wildcards(match):
+            field = match.group(1)
+            values_str = match.group(2)
+            values = re.findall(r'"([^"]*)"', values_str)
+            if not values:
+                values = re.findall(r"'([^']*)'", values_str)
+            if not values:
+                values = [v.strip() for v in values_str.split(',')]
+            has_wildcard = any('*' in v for v in values)
+            if not has_wildcard and len(values) > 1:
+                return match.group(0)
+            if len(values) == 1:
+                return f'{field}="{values[0]}"'
+            return '(' + ' OR '.join(f'{field}="{v}"' for v in values) + ')'
+
+        spl_query = re.sub(r'(\w+)\s+IN\s*\(([^)]+)\)', fix_in_with_wildcards, spl_query)
+
+        # Fix 2: Duplicate EventCode=X EventCode=X
+        spl_query = re.sub(r'(EventCode[=]\s*\d+)\s+\1', r'\1', spl_query)
+
+        # Fix 3: Collapse redundant whitespace
+        spl_query = re.sub(r'  +', ' ', spl_query).strip()
+
+        # Fix 4: Quadruple backslash → double
+        spl_query = spl_query.replace('\\\\\\\\', '\\\\')
+
+        # ── Apply environment-specific source/index fixes ──
         spl_query = spl_query.replace(
             'source="WinEventLog:Microsoft-Windows-Sysmon/Operational"',
             'index="sysmon" source="XmlWinEventLog:Microsoft-Windows-Sysmon/Operational"'
@@ -369,6 +398,15 @@ def convert_sigma_file(sigma_path):
             'source="WinEventLog:Microsoft-Windows-PowerShell/Operational"',
             'index="windows" source="WinEventLog:Microsoft-Windows-PowerShell/Operational"'
         )
+        spl_query = spl_query.replace(
+            'source="WinEventLog:Microsoft-Windows-TaskScheduler/Operational"',
+            'index="windows" source="WinEventLog:Microsoft-Windows-TaskScheduler/Operational"'
+        )
+        if 'index=' not in spl_query and 'source="' in spl_query:
+            if 'Sysmon' in spl_query:
+                spl_query = 'index="sysmon" ' + spl_query
+            else:
+                spl_query = 'index="windows" ' + spl_query
 
         # Extract metadata
         tags = rule_data.get('tags', [])
@@ -550,13 +588,8 @@ def create_saved_search(rule_data):
         'alert_threshold': '0',
         'alert.severity': severity,
         'description': rule_data.get('description', '')[:250],
-        'disabled': 0,
+        'disabled': 1,  # detection_scheduler.py handles alerting, not Splunk
     }
-
-    # Add webhook action if n8n URL is configured
-    if N8N_WEBHOOK_URL:
-        payload['actions'] = 'webhook'
-        payload['action.webhook.param.url'] = N8N_WEBHOOK_URL
 
     resp = splunk_api('POST', '/servicesNS/admin/search/saved/searches', data=payload)
 
@@ -608,12 +641,8 @@ def update_saved_search(rule_data):
         'alert_threshold': '0',
         'alert.severity': severity,
         'description': rule_data.get('description', '')[:250],
-        'disabled': 0,
+        'disabled': 1,  # detection_scheduler.py handles alerting, not Splunk
     }
-
-    if N8N_WEBHOOK_URL:
-        payload['actions'] = 'webhook'
-        payload['action.webhook.param.url'] = N8N_WEBHOOK_URL
 
     resp = splunk_api(
         'POST',
@@ -623,6 +652,10 @@ def update_saved_search(rule_data):
 
     if resp and resp.status_code in [200, 201]:
         return True
+    elif resp and resp.status_code == 404:
+        # Search doesn't exist in Splunk (was deleted) — fall back to create
+        print(f"    {C.YELLOW}Search not found in Splunk — creating instead{C.END}")
+        return create_saved_search(rule_data)
     else:
         if resp:
             try:
@@ -719,7 +752,7 @@ def deploy_added(sigma_path, state, existing_searches, dry_run=False):
         return False
 
 
-def deploy_modified(sigma_path, state, dry_run=False):
+def deploy_modified(sigma_path, state, dry_run=False, force=False):
     """Handle a modified Sigma rule.
     
     1. Check if content actually changed (hash comparison)
@@ -732,7 +765,7 @@ def deploy_modified(sigma_path, state, dry_run=False):
     old_hash = state['deployed_rules'].get(sigma_path, {}).get('content_hash', '')
     new_hash = file_hash(os.path.join(REPO_ROOT, sigma_path))
 
-    if old_hash == new_hash:
+    if old_hash == new_hash and not force:
         print(f"    {C.DIM}Content unchanged (hash match) — skipping{C.END}")
         return True
 
@@ -1006,7 +1039,7 @@ Examples:
                 continue
 
             if rule_path in state['deployed_rules']:
-                if deploy_modified(rule_path, state, args.dry_run):
+                if deploy_modified(rule_path, state, args.dry_run, force=True):
                     stats['updated'] += 1
                 else:
                     stats['failed'] += 1

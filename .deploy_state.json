@@ -1,5 +1,5 @@
 {
-  "last_deploy": "2026-04-05T15:17:59.906346+00:00",
+  "last_deploy": "2026-04-05T15:19:40.947649+00:00",
   "deployed_rules": {
     "rules/Apt-Konni/KONNI Cleanup - Fodhelper Registry Key Removal.yml": {
       "content_hash": "1bc1386e5a337fff71c2f5e53b7e3db4d3a6f9f7a5ab7a4696eebd24b42fd890",
