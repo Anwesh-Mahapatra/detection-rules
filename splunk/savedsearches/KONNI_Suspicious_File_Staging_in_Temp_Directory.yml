@@ -1,0 +1,30 @@
+rule_title: KONNI Suspicious File Staging in Temp Directory
+rule_id: no-id
+rule_level: medium
+mitre_attack:
+- attack.initial_access
+- attack.defense_evasion
+- attack.t1566.002
+- attack.t1140
+description: 'Detects creation of suspicious files (.lnk, .cab, .ps1) inside a newly
+  created subdirectory under %TEMP%, consistent with KONNI initial access lure delivery
+  and payload staging.
+
+  '
+spl_query: index="sysmon" source="XmlWinEventLog:Microsoft-Windows-Sysmon/Operational"
+  EventCode=11 EventCode=11 TargetFilename="*\\AppData\\Local\\Temp\\*" TargetFilename
+  IN ("*.lnk", "*.cab", "*.ps1")
+source_sigma_file: rules/Apt-Konni/KONNI Suspicious File Staging in Temp Directory.yml
+converted_at: '2026-04-05T11:39:17.699770+00:00'
+splunk_saved_search:
+  name: 'Detection: KONNI Suspicious File Staging in Temp Directory'
+  search: index="sysmon" source="XmlWinEventLog:Microsoft-Windows-Sysmon/Operational"
+    EventCode=11 EventCode=11 TargetFilename="*\\AppData\\Local\\Temp\\*" TargetFilename
+    IN ("*.lnk", "*.cab", "*.ps1")
+  cron_schedule: '*/5 * * * *'
+  is_scheduled: true
+  alert_type: number of events
+  alert_threshold: 0
+  alert_comparator: greater than
+  dispatch_earliest_time: -5m
+  dispatch_latest_time: now

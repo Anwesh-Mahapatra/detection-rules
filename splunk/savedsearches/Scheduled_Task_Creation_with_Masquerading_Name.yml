@@ -1,0 +1,30 @@
+rule_title: Scheduled Task Creation with Masquerading Name
+rule_id: no-id
+rule_level: high
+mitre_attack:
+- attack.persistence
+- attack.t1053.005
+description: 'Detects schtasks.exe creating a task whose name impersonates a legitimate
+  service (OneDrive, Chrome, Defender, etc.) while the task action executes PowerShell
+  or cmd with hidden/noprofile flags. Consistent with KONNI persistence mechanism.
+
+  '
+spl_query: index="sysmon" source="XmlWinEventLog:Microsoft-Windows-Sysmon/Operational"
+  EventCode=1 EventCode=1 Image="*\\schtasks.exe" CommandLine="*/create*" CommandLine
+  IN ("*OneDrive*", "*ChromeUpdate*", "*EdgeUpdate*", "*DefenderUpdate*", "*WindowsUpdate*",
+  "*OfficeUpdate*", "*TeamsUpdate*")
+source_sigma_file: rules/Apt-Konni/Scheduled Task Creation with Masquerading Name.yml
+converted_at: '2026-04-05T11:39:18.731770+00:00'
+splunk_saved_search:
+  name: 'Detection: Scheduled Task Creation with Masquerading Name'
+  search: index="sysmon" source="XmlWinEventLog:Microsoft-Windows-Sysmon/Operational"
+    EventCode=1 EventCode=1 Image="*\\schtasks.exe" CommandLine="*/create*" CommandLine
+    IN ("*OneDrive*", "*ChromeUpdate*", "*EdgeUpdate*", "*DefenderUpdate*", "*WindowsUpdate*",
+    "*OfficeUpdate*", "*TeamsUpdate*")
+  cron_schedule: '*/2 * * * *'
+  is_scheduled: true
+  alert_type: number of events
+  alert_threshold: 0
+  alert_comparator: greater than
+  dispatch_earliest_time: -2m
+  dispatch_latest_time: now

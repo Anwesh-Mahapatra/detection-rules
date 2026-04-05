@@ -68,7 +68,7 @@ urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 # ============================================================
 
 # Splunk connection
-SPLUNK_HOST = os.environ.get('SPLUNK_HOST', 'localhost')
+SPLUNK_HOST = os.environ.get('SPLUNK_HOST', '192.168.0.8')
 SPLUNK_PORT = os.environ.get('SPLUNK_PORT', '8089')
 SPLUNK_WEB_PORT = os.environ.get('SPLUNK_WEB_PORT', '8000')
 SPLUNK_USER = os.environ.get('SPLUNK_USER', 'admin')

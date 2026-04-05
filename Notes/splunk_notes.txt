@@ -1,0 +1,1 @@
+/opt/splunk/bin/splunk stop && /opt/splunk/bin/splunk clean eventdata -index sysmon -f && /opt/splunk/bin/splunk clean eventdata -index windows -f && /opt/splunk/bin/splunk start
