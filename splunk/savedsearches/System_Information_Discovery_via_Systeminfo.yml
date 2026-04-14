@@ -12,7 +12,7 @@ description: 'Detects execution of systeminfo.exe, commonly used by APT groups i
 spl_query: index="sysmon" source="XmlWinEventLog:Microsoft-Windows-Sysmon/Operational"
   EventCode=1 Image="*\\systeminfo.exe"
 source_sigma_file: rules/Apt-Konni/System Information Discovery via Systeminfo.yml
-converted_at: '2026-04-05T15:33:48.280599+00:00'
+converted_at: '2026-04-14T17:33:05.086670+00:00'
 splunk_saved_search:
   name: 'Detection: System Information Discovery via Systeminfo'
   search: index="sysmon" source="XmlWinEventLog:Microsoft-Windows-Sysmon/Operational"

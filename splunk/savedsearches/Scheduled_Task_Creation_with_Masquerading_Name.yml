@@ -14,7 +14,7 @@ spl_query: index="sysmon" source="XmlWinEventLog:Microsoft-Windows-Sysmon/Operat
   OR CommandLine="*ChromeUpdate*" OR CommandLine="*EdgeUpdate*" OR CommandLine="*DefenderUpdate*"
   OR CommandLine="*WindowsUpdate*" OR CommandLine="*OfficeUpdate*" OR CommandLine="*TeamsUpdate*")
 source_sigma_file: rules/Apt-Konni/Scheduled Task Creation with Masquerading Name.yml
-converted_at: '2026-04-05T15:33:47.219376+00:00'
+converted_at: '2026-04-14T17:33:04.028310+00:00'
 splunk_saved_search:
   name: 'Detection: Scheduled Task Creation with Masquerading Name'
   search: index="sysmon" source="XmlWinEventLog:Microsoft-Windows-Sysmon/Operational"

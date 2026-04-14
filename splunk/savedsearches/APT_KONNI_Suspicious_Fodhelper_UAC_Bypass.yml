@@ -10,7 +10,7 @@ spl_query: index="sysmon" source="XmlWinEventLog:Microsoft-Windows-Sysmon/Operat
   EventCode=1 Image="*\\fodhelper.exe" (ParentImage="*\\powershell.exe" OR ParentImage="*\\cmd.exe"
   OR ParentImage="*\\pwsh.exe")
 source_sigma_file: rules/Apt-Konni/Suspicious Fodhelper UAC Bypass.yml
-converted_at: '2026-04-05T15:33:47.746689+00:00'
+converted_at: '2026-04-14T17:33:04.557396+00:00'
 splunk_saved_search:
   name: 'Detection: APT KONNI Suspicious Fodhelper UAC Bypass'
   search: index="sysmon" source="XmlWinEventLog:Microsoft-Windows-Sysmon/Operational"

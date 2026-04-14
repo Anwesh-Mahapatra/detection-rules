@@ -68,7 +68,7 @@ urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 # ============================================================
 
 # Splunk connection
-SPLUNK_HOST = os.environ.get('SPLUNK_HOST', '192.168.0.8')
+SPLUNK_HOST = os.environ.get('SPLUNK_HOST', '192.168.1.162')
 SPLUNK_PORT = os.environ.get('SPLUNK_PORT', '8089')
 SPLUNK_WEB_PORT = os.environ.get('SPLUNK_WEB_PORT', '8000')
 SPLUNK_USER = os.environ.get('SPLUNK_USER', 'admin')
@@ -78,7 +78,7 @@ SPLUNK_API = f"https://{SPLUNK_HOST}:{SPLUNK_PORT}"
 # n8n webhook for alert forwarding
 N8N_WEBHOOK_URL = os.environ.get(
     'N8N_WEBHOOK_URL',
-    'http://192.168.0.8:5678/webhook-test/splunk-alert'
+    'http://192.168.1.162:5678/webhook-test/splunk-alert'
 )
 
 # Paths
