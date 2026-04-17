@@ -1,5 +1,5 @@
 {
-  "last_deploy": "2026-04-14T17:32:09.991286+00:00",
+  "last_deploy": "2026-04-14T17:36:54.305439+00:00",
   "deployed_rules": {
     "rules/Apt-Konni/Fodhelper Registry Hijack Setup.yml": {
       "content_hash": "848016e8e606c9f74422f75a576fa0338065361d0d7f9d6e16b0509aaa2f43b3",
